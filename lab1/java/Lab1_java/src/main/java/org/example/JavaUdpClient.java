@@ -10,7 +10,7 @@ public class JavaUdpClient {
     {
         System.out.println("JAVA UDP CLIENT");
         DatagramSocket socket = null;
-        int portNumber = 9008;
+        int portNumber = 9009;
 
         try {
             socket = new DatagramSocket();
@@ -23,7 +23,7 @@ public class JavaUdpClient {
             byte[] receiveBuffer = new byte[1024];
             var receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
             socket.receive(receivePacket);
-            String msg = new String(receivePacket.getData());
+            String msg = new String(receivePacket.getData()).trim();
             System.out.println("received response: " + msg);
         }
         catch(Exception e){

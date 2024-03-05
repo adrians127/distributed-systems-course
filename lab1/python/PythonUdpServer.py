@@ -13,4 +13,3 @@ while True:
     print("python udp server received msg: " + str(buff, 'cp1250'))
 
 
-
