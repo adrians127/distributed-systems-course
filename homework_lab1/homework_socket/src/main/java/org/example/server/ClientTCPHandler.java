@@ -2,7 +2,6 @@ package org.example.server;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.Arrays;
 
 public class ClientTCPHandler implements Runnable {
     private final Socket clientSocket;
@@ -31,7 +30,7 @@ public class ClientTCPHandler implements Runnable {
                     break;
                 }
                 System.out.println("Got message with id:" + id + " from '" + nickname + "': " + clientMessage);
-                server.sendToAllClients(nickname + ": " + clientMessage, id);
+                server.sendTcpMessage(nickname + ": " + clientMessage, id);
             }
         } catch (IOException e) {
             System.out.println(e.getMessage());

@@ -4,13 +4,24 @@ import java.util.Scanner;
 
 public class ClientMain {
     public static void main(String[] args) {
-        final int port = parsePort(args);
+        final int tcpPort = parseTcpPort(args);
+        final int udpPort = parseUdpPort(args);
         final String nickname = parseNickname(args);
-        Client client = new Client(port, nickname);
+        Client client = new Client(tcpPort, udpPort, nickname);
         client.start();
     }
 
-    private static int parsePort(String[] args) {
+    private static int parseTcpPort(String[] args) {
+        try {
+            return Integer.parseInt(args[0]);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid port: " + args[0]);
+        } catch (ArrayIndexOutOfBoundsException e) {
+            throw new IllegalArgumentException("Port not provided");
+        }
+    }
+
+    private static int parseUdpPort(String[] args) {
         try {
             return Integer.parseInt(args[1]);
         } catch (NumberFormatException e) {

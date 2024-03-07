@@ -1,8 +1,7 @@
 package org.example.server;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -14,32 +13,59 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Server {
-    private final int port;
+    public static final int bufferForUdpMessage = 1024;
+    private final int tcpPort;
+    private final int udpPort;
     private ServerSocket serverSocket; // TCP
     private DatagramSocket datagramSocket; // UDP
     private final ExecutorService tcpConnections;
     private final Map<Integer, ClientTCPHandler> clients = new HashMap<>();
     private final Queue<Integer> availableIds = new LinkedList<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
-    private final int maxClients;
-    private int numberOfConnections = 0;
 
-    public Server(int port, int tcpConnections) {
-        this.port = port;
+    public Server(int tcpPort, int tcpConnections, int udpPort) {
+        this.tcpPort = tcpPort;
         this.tcpConnections = Executors.newFixedThreadPool(tcpConnections);
-        this.maxClients = tcpConnections;
-        for (int i = 0; i < maxClients; i++) {
+        this.udpPort = udpPort;
+        for (int i = 0; i < tcpConnections; i++) {
             availableIds.add(i);
         }
         Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
-        new Thread(this::listenForExitCommand).start();
     }
 
     public void start() {
+        new Thread(this::listenForExitCommand).start();
         serverSocket = createServerSocket();
-        System.out.println("Server started on port " + port);
+        datagramSocket = createDatagramSocket();
+        var udpThread = new Thread(this::handleUdpPackets);
+        udpThread.start();
+        System.out.println("TCP Server started on port " + tcpPort);
+        System.out.println("UDP Server started on port " + udpPort);
         while (running.get()) {
             acceptClient();
+        }
+    }
+
+    private DatagramSocket createDatagramSocket() {
+        try {
+            return new DatagramSocket(udpPort);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create datagram socket: " + e.getMessage());
+        }
+    }
+
+    private void handleUdpPackets() {
+        byte[] buffer = new byte[bufferForUdpMessage];
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+        while (true) {
+            try {
+                datagramSocket.receive(packet);
+                String message = new String(packet.getData(), 0, packet.getLength());
+                System.out.println("Got UDP message: " + message);
+                sendTcpMessage(message, -1);
+            } catch (IOException e) {
+                System.err.println("Failed to receive UDP packet: " + e.getMessage());
+            }
         }
     }
 
@@ -53,7 +79,6 @@ public class Server {
             }
             int clientId = availableIds.poll();
             var client = new ClientTCPHandler(clientSocket, clientId, this);
-            numberOfConnections++;
             clients.put(clientId, client);
             tcpConnections.submit(client);
         } catch (RejectedExecutionException e) {
@@ -65,7 +90,7 @@ public class Server {
 
     private ServerSocket createServerSocket() {
         try {
-            return new ServerSocket(port);
+            return new ServerSocket(tcpPort);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create server socket: " + e.getMessage());
         }
@@ -105,16 +130,16 @@ public class Server {
         }
     }
 
-    public synchronized void sendToAllClients(String message, int fromId) {
+    public synchronized void sendTcpMessage(String message, int fromId) {
         for (var entry : clients.entrySet()) {
             if (entry.getKey() != fromId) {
                 entry.getValue().sendMessage(message);
             }
         }
     }
+
     public synchronized void removeClient(ClientTCPHandler client) {
         clients.remove(client.getId());
         availableIds.add(client.getId());
-        numberOfConnections--;
     }
 }
